@@ -50,5 +50,3 @@ export function CreateRoomForm() {
     </form>
   );
 }
-
-export default CreateRoomForm;
