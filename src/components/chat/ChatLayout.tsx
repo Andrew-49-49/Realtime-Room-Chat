@@ -20,13 +20,12 @@ interface ChatLayoutProps {
   isCreating: boolean;
 }
 
-let socket: Socket | null = null;
-
 export default function ChatLayout({ roomCode, initialNickname, isCreating }: ChatLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!initialNickname) {
@@ -38,56 +37,72 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
       router.push('/');
       return;
     }
+    
+    // Initialize socket connection
+    socketRef.current = io();
+    const socket = socketRef.current;
 
-    socket = io();
+    const handleConnect = () => {
+      socket.emit('join-room', { roomCode, nickname: initialNickname, create: isCreating });
+    };
 
-    socket.on('connect', () => {
-      socket?.emit('join-room', { roomCode, nickname: initialNickname, create: isCreating });
-    });
-
-    socket.on('join-success', (history: Message[]) => {
+    const handleJoinSuccess = (history: Message[]) => {
       setMessages(history);
       toast({
         title: `Joined Room: ${roomCode}`,
         description: "You can now start sending messages.",
       });
-    });
+    };
 
-    socket.on('join-error', (error: string) => {
+    const handleJoinError = (error: string) => {
       toast({
         variant: "destructive",
         title: "Failed to join room",
         description: error,
       });
       router.push('/');
-    });
+    };
 
-    socket.on('user-list-update', (userList: User[]) => {
+    const handleUserListUpdate = (userList: User[]) => {
       setUsers(userList);
-    });
+    };
 
-    socket.on('new-message', (message: Message) => {
+    const handleNewMessage = (message: Message) => {
       setMessages(prev => [...prev, message]);
-    });
+    };
 
-    socket.on('connect_error', () => {
-        toast({
-            variant: "destructive",
-            title: "Connection Failed",
-            description: "Could not connect to the server. Please try again later.",
-        });
-        router.push('/');
-    });
+    const handleConnectError = () => {
+      toast({
+          variant: "destructive",
+          title: "Connection Failed",
+          description: "Could not connect to the server. Please try again later.",
+      });
+      router.push('/');
+    };
 
+    socket.on('connect', handleConnect);
+    socket.on('join-success', handleJoinSuccess);
+    socket.on('join-error', handleJoinError);
+    socket.on('user-list-update', handleUserListUpdate);
+    socket.on('new-message', handleNewMessage);
+    socket.on('connect_error', handleConnectError);
+
+    // Cleanup on component unmount
     return () => {
-      socket?.disconnect();
-      socket = null;
+      socket.off('connect', handleConnect);
+      socket.off('join-success', handleJoinSuccess);
+      socket.off('join-error', handleJoinError);
+      socket.off('user-list-update', handleUserListUpdate);
+      socket.off('new-message', handleNewMessage);
+      socket.off('connect_error', handleConnectError);
+      socket.disconnect();
+      socketRef.current = null;
     };
   }, [roomCode, initialNickname, router, toast, isCreating]);
 
   const handleSendMessage = (content: string) => {
-    if (socket) {
-      socket.emit('send-message', { content });
+    if (socketRef.current) {
+      socketRef.current.emit('send-message', { content });
     }
   };
   
