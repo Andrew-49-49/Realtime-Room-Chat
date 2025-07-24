@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { createRoom } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ const initialState = {
 };
 
 export function CreateRoomForm() {
-  const [state, formAction] = useFormState(createRoom, initialState);
+  const [state, formAction] = useActionState(createRoom, initialState);
   const { toast } = useToast();
 
   useEffect(() => {
