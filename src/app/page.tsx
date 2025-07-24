@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateRoomForm } from "@/components/landing/CreateRoomForm";
 import { JoinRoomForm } from "@/components/landing/JoinRoomForm";
-import { MessageSquarePlus } from "lucide-react";
+import { Spy } from "lucide-react";
 
 export default function Home() {
   return (
@@ -11,11 +11,11 @@ export default function Home() {
         <Card className="shadow-2xl bg-card/80 backdrop-blur-sm border-primary/20">
           <CardHeader className="text-center">
             <div className="flex justify-center items-center gap-2 mb-2">
-              <MessageSquarePlus className="w-8 h-8 text-primary" />
-              <CardTitle className="text-3xl font-headline font-bold text-primary">Realtime Chat</CardTitle>
+              <Spy className="w-8 h-8 text-primary" />
+              <CardTitle className="text-3xl font-headline font-bold text-primary">Insider Game Room</CardTitle>
             </div>
             <CardDescription className="text-muted-foreground">
-              Create a room or join one to start chatting!
+              Uncover the secret word, but don't get caught as the Insider!
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -34,7 +34,7 @@ export default function Home() {
           </CardContent>
         </Card>
         <p className="text-center text-sm text-muted-foreground mt-4">
-          Powered by Next.js & Socket.IO
+          Powered by deception & Socket.IO
         </p>
       </div>
     </main>
