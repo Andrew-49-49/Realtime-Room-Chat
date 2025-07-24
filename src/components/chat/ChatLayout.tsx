@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import io, { type Socket } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 import { useToast } from "@/hooks/use-toast";
-import type { User, Message } from "@/lib/types";
+import type { User, Message, GameState } from "@/lib/types";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import { Copy, LogOut, MessageSquare, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../ui/sheet";
+import GameControl from "./GameControl";
 
 interface ChatLayoutProps {
   roomCode: string;
@@ -25,6 +26,10 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [gameState, setGameState] = useState<GameState>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [targetWord, setTargetWord] = useState<string | null>(null);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -39,15 +44,18 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
     }
     
     // Initialize socket connection
-    socketRef.current = io();
-    const socket = socketRef.current;
+    const socket = io();
+    socketRef.current = socket;
 
     const handleConnect = () => {
+      console.log('Socket connected, emitting join-room');
       socket.emit('join-room', { roomCode, nickname: initialNickname, create: isCreating });
     };
 
-    const handleJoinSuccess = (history: Message[]) => {
+    const handleJoinSuccess = ({ messages: history, gameState: initialGameState, ownerId: roomOwnerId }: { messages: Message[], gameState: GameState, ownerId: string }) => {
       setMessages(history);
+      setGameState(initialGameState);
+      setOwnerId(roomOwnerId);
       toast({
         title: `Joined Room: ${roomCode}`,
         description: "You can now start sending messages.",
@@ -71,7 +79,8 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
       setMessages(prev => [...prev, message]);
     };
 
-    const handleConnectError = () => {
+    const handleConnectError = (error: any) => {
+      console.error('Connection Failed:', error);
       toast({
           variant: "destructive",
           title: "Connection Failed",
@@ -80,12 +89,38 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
       router.push('/');
     };
 
+    const handleGameStateUpdate = (newGameState: GameState) => {
+        setGameState(newGameState);
+    }
+
+    const handleRoleAssigned = ({ role, targetWord: newTargetWord }: {role: string, targetWord?: string}) => {
+        setRole(role);
+        if (newTargetWord) {
+            setTargetWord(newTargetWord);
+        }
+        toast({
+            title: "Game Role Assigned!",
+            description: `You are the ${role}. ${newTargetWord ? `The word is "${newTargetWord}".`: ''}`
+        })
+    }
+    
+    const handleGameError = (error: string) => {
+        toast({
+            variant: "destructive",
+            title: "Game Error",
+            description: error,
+        });
+    }
+
     socket.on('connect', handleConnect);
     socket.on('join-success', handleJoinSuccess);
     socket.on('join-error', handleJoinError);
     socket.on('user-list-update', handleUserListUpdate);
     socket.on('new-message', handleNewMessage);
     socket.on('connect_error', handleConnectError);
+    socket.on('game-state-update', handleGameStateUpdate);
+    socket.on('role-assigned', handleRoleAssigned);
+    socket.on('game-error', handleGameError);
 
     // Cleanup on component unmount
     return () => {
@@ -95,14 +130,17 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
       socket.off('user-list-update', handleUserListUpdate);
       socket.off('new-message', handleNewMessage);
       socket.off('connect_error', handleConnectError);
+      socket.off('game-state-update', handleGameStateUpdate);
+      socket.off('role-assigned', handleRoleAssigned);
+      socket.off('game-error', handleGameError);
       socket.disconnect();
       socketRef.current = null;
     };
   }, [roomCode, initialNickname, router, toast, isCreating]);
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = (content: string, messageType: Message['type'] = 'user') => {
     if (socketRef.current) {
-      socketRef.current.emit('send-message', { content });
+      socketRef.current.emit('send-message', { content, messageType });
     }
   };
   
@@ -117,6 +155,27 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
       description: "Room code has been copied to your clipboard.",
     });
   };
+
+  const isOwner = socketRef.current?.id === ownerId;
+
+  const handleStartGame = (targetWord: string) => {
+      if(socketRef.current) {
+          socketRef.current.emit('start-game', { targetWord });
+      }
+  }
+
+  const handleWordGuessed = () => {
+      if(socketRef.current) {
+          socketRef.current.emit('word-guessed');
+      }
+  }
+
+  const handleSubmitVote = (votedForNickname: string) => {
+    if (socketRef.current) {
+        socketRef.current.emit('submit-vote', { votedForNickname });
+    }
+  };
+
 
   return (
     <div className="flex h-screen w-full flex-col md:flex-row bg-background">
@@ -156,10 +215,18 @@ export default function ChatLayout({ roomCode, initialNickname, isCreating }: Ch
             </Button>
           </div>
         </header>
-
+        <GameControl
+            gameState={gameState}
+            isOwner={isOwner}
+            onStartGame={handleStartGame}
+            onWordGuessed={handleWordGuessed}
+            users={users}
+            currentUserNickname={initialNickname}
+            onSubmitVote={handleSubmitVote}
+        />
         <Card className="flex-1 flex flex-col overflow-hidden m-2 md:m-4 mt-0 md:mt-0 rounded-lg border-primary/10 shadow-inner">
           <MessageList messages={messages} currentUserNickname={initialNickname} />
-          <MessageInput onSendMessage={handleSendMessage} />
+          <MessageInput onSendMessage={handleSendMessage} gameState={gameState} role={role} />
         </Card>
       </main>
     </div>

@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "../ui/avatar";
+import { HelpCircle, Target } from "lucide-react";
 
 interface MessageListProps {
   messages: Message[];
@@ -23,6 +24,22 @@ export default function MessageList({ messages, currentUserNickname }: MessageLi
         }
     }
   }, [messages]);
+
+  const renderMessageContent = (msg: Message) => {
+    const prefix = {
+      question: <HelpCircle className="inline-block mr-2 h-5 w-5 text-yellow-500" />,
+      guess: <Target className="inline-block mr-2 h-5 w-5 text-green-500" />,
+      answer: null,
+      user: null,
+      notification: null
+    };
+    return (
+      <>
+        {prefix[msg.type]}
+        <span className="whitespace-pre-wrap">{msg.content}</span>
+      </>
+    );
+  };
 
   return (
     <ScrollArea className="flex-1" ref={scrollAreaRef}>
@@ -60,7 +77,7 @@ export default function MessageList({ messages, currentUserNickname }: MessageLi
                 {!isCurrentUser && (
                   <p className="font-semibold text-primary mb-1">{msg.sender}</p>
                 )}
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <div className="flex items-center">{renderMessageContent(msg)}</div>
                 <p className={cn("text-xs mt-1", isCurrentUser ? "text-primary-foreground/70" : "text-muted-foreground")}>
                   {msg.timestamp ? format(parseISO(msg.timestamp), 'h:mm a') : ''}
                 </p>
