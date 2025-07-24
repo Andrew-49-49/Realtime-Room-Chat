@@ -60,3 +60,5 @@ export function JoinRoomForm() {
     </form>
   );
 }
+
+export default JoinRoomForm;
